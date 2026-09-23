@@ -6,51 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SoundSpace</title>
     
+    <!-- 스타일 시트 연결 -->
+    <link rel="stylesheet" href="style.css">
 
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #111;
-            font-family: sans-serif;
-        }
+    <script type="importmap">
+    {
+		"imports": {
+			"three": "https://cdn.jsdelivr.net/npm/three/build/three.module.js"
+            ,"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+		}
+    }
+    </script>
 
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
+    <script type="module" src="main.js"></script>
 
-        #connect-btn {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 15px 30px;
-            font-size: 16px;
-            background-color: #007fff;
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,127,255,0.4);
-            z-index: 10;
-            transition: all 0.3s ease;
-        }
-        #connect-btn:hover {
-            background-color: #0055cc;
-            box-shadow: 0 6px 20px rgba(0,127,255,0.6);
-        }
-    </style>
 
 </head>
 <body>
 
     <div id="canvas-container"></div>
-    <button id="connect-btn">시스템 시작</button>
+    <button id="connect-btn">Start</button>
 
 </body>
 </html>
