@@ -4,125 +4,232 @@ import * as THREE from 'three';
 
 export class CCySoundThree {
     constructor() {
-        // 1. Three.js의 오디오 리스너 생성 (귀 역할)
         this.listener = new THREE.AudioListener();
+        this.ctx = this.listener.context; // Web Audio API Context 
 
-        this.ctx = this.listener.context; // 로레벨 AudioContext 추출 ( 클럭 역할)
-
-        // 2. 좌/우 독립 발진기 및 채널 관리 변수 선언
+        // 1. 회로 부품(노드) 선언
         this.oscLeft = null;
         this.oscRight = null;
-        this.isSameFrequency = false; // 좌우 동기화 체크박스 상태 변수
+        this.pannerLeft = null;
+        this.pannerRight = null;
+        this.gainLeft = null;   // 좌측 개별 볼륨 회로
+        this.gainRight = null;  // 우측 개별 볼륨 회로
 
-        // 3. 상태 관리 변수 (현재 주파수 저장용)
-        this.freqLeft = 440;  // 초기값 440Hz
-        this.freqRight = 480; // 초기값 445Hz (바이노럴 효과를 위해 5Hz 차이)
+        // 2. 단속 게이트 회로 핵심 부품
+        this.gateLFO = null;    // 펄스를 만들어줄 저주파 발진기
+        this.gateGain = null;   // 게이트 스위칭 밸브
 
-        // [중요] 게이트 회로을 연결할 최종 마스터 출력 노드 미리 준비
+        // 3. 최종 마스터 출력단
         this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime); // 초기에는 소리 안 나게 0 설정
-        
-        // 최종적으로 Three.js 리스너의 출력단(스피커)에 마스터 노드를 연결
+        this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime); // 초기 차단 상태
         this.masterGain.connect(this.ctx.destination);
 
-        this.isInitialized = false;  // generator구성 완료 여부
-        this.isOnGenerator = false; 
+        this.isInitialized = false;
+        this.isOnGenerator = false;
+
+        // 4. 내부 상태 저장 변수들
+        this.params = null; 
     }
 
     /**
-     * 신호 발생기 구동 시작 ( 발진 시작)
-     * 브라우저 보안 정책상 사용자 클릭 이벤트 내부에서 한 번 호출되어야 합니다.
+     * 회로 최초 1회 생성 및 초기화
+     * @param {Object} ParamsSound - main의 상태 객체 참조
      */
-    startGenerator() {
-        // 최초 1회만 발진기를 만들고 재생
-        if (!this.isInitialized) {
-            this.oscLeft = this.ctx.createOscillator();
-            this.oscLeft.type = 'sine';
-            this.oscLeft.frequency.setValueAtTime(this.freqLeft, this.ctx.currentTime);
+    initGenerator(ParamsSound) {
+        if (this.isInitialized) return;
+        this.params = ParamsSound;
 
-            const pannerLeft = this.ctx.createStereoPanner();
-            pannerLeft.pan.setValueAtTime(-1, this.ctx.currentTime);
+        // [A] 오디오 소스 발진기 및 팬 노드 생성
+        this.oscLeft = this.ctx.createOscillator();
+        this.oscRight = this.ctx.createOscillator();
+        this.oscLeft.type = 'sine';
+        this.oscRight.type = 'sine';
 
-            this.oscRight = this.ctx.createOscillator();
-            this.oscRight.type = 'sine';
-            this.oscRight.frequency.setValueAtTime(this.freqRight, this.ctx.currentTime);
+        this.pannerLeft = this.ctx.createStereoPanner();
+        this.pannerRight = this.ctx.createStereoPanner();
+        this.pannerLeft.pan.setValueAtTime(-1, this.ctx.currentTime);
+        this.pannerRight.pan.setValueAtTime(1, this.ctx.currentTime);
 
-            const pannerRight = this.ctx.createStereoPanner();
-            pannerRight.pan.setValueAtTime(1, this.ctx.currentTime);
+        this.gainLeft = this.ctx.createGain();
+        this.gainRight = this.ctx.createGain();
 
-            this.oscLeft.connect(pannerLeft);
-            pannerLeft.connect(this.masterGain);
+        // [B] 게이트 단속용 커스텀 LFO 및 스위칭 게인 회로 구성
+        // 듀티비를 완벽한 사각파 레벨로 제어하기 위해 오디오 노드 신호 연산을 사용합니다.
+        this.gateLFO = this.ctx.createOscillator();
+        this.gateLFO.type = 'sawtooth'; // 톱니파를 사용하여 듀티비 기준선 비교 처리 기반 마련
+        this.gateGain = this.ctx.createGain(); 
 
-            this.oscRight.connect(pannerRight);
-            pannerRight.connect(this.masterGain);
+        // [C] 회로 배선 연결 (Signal Routing)
+        // 좌측 채널: OscL -> GainL -> PannerL -> GateGain
+        this.oscLeft.connect(this.gainLeft);
+        this.gainLeft.connect(this.pannerLeft);
+        this.pannerLeft.connect(this.gateGain);
 
-            //  신호 발생 클럭 기동
-            this.oscLeft.start();
-            this.oscRight.start();
-            
-            this.isInitialized = true;
+        // 우측 채널: OscR -> GainR -> PannerR -> GateGain
+        this.oscRight.connect(this.gainRight);
+        this.gainRight.connect(this.pannerRight);
+        this.pannerRight.connect(this.gateGain);
+
+        // 게이트 출력 -> 최종 마스터 출력
+        this.gateGain.connect(this.masterGain);
+
+        // 발진 클럭 영구 기동
+        this.oscLeft.start();
+        this.oscRight.start();
+        this.gateLFO.start();
+
+        this.isInitialized = true;
+
+        // 현재 파라미터 초기값 회로 적용
+        this.updateCarrier();
+        this.updateGate();
+        this.updateBalance();
+    }
+
+    /**
+     * 신호 발생기 출력 개방 (소리 켬)
+     * 앞에 반드시 'async'가 붙어 있어야 내부에서 await를 쓸 수 있습니다!
+     */
+    async startGenerator() {
+        if (!this.isInitialized) return;
+
+        // [핵심 보정] 오디오 컨텍스트가 잠들어 있다면 깨어날 때까지 명시적으로 기다립니다.
+        // 출력시 왼쪽이 먼저 들리고 1초정도 지나서 오른쪽 들리는 문제 해결. 
+        if (this.ctx.state === 'suspended') {
+            await this.ctx.resume();
         }
 
-
-        // 밸브를 열어 소리가 나가게 합니다 (전자회로 게이트 ON 느낌)
-        // setValueAtTime을 써서 즉각적인 디지털적 켜짐을 구현합니다.
+        // 출력 개방
         this.masterGain.gain.setValueAtTime(0.5, this.ctx.currentTime); 
         this.isOnGenerator = true;
-        console.log("⚡ 신호 발생기 출력 개방 (소리 켬)");
+
+        // [핵심 보정] 하드웨어가 완전히 활성화된 이 시점에 게이트 타이머를 깨웁니다.
+        this.updateGate();
+
+        console.log("⚡ 신호 발생기 출력 ON");
     }
+
+    /**
+     * 신호 발생기 출력 차단 (소리 끔)
+     */
     stopGenerator() {
         if (!this.isInitialized) return;
 
-        // 발진기를 파괴하는 대신, 마스터 게인의 크기를 완전히 0(GND 레벨)으로 차단.
+            // 게이트 타이머 즉시 소거 (오프 상태에서 불필요한 루프 방지)
+        if (this.gateTimer) {
+            clearInterval(this.gateTimer);
+            this.gateTimer = null;
+        }
+
         this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime);
-        
         this.isOnGenerator = false;
-        console.log("🛑 신호 발생기 출력 차단 (소리 끔)");
-    }
-    /**
-     * 왼쪽 주파수 설정 (10Hz ~ 10000Hz 범위 제한)
-     */
-    setLeftFrequency(hz) {
-        this.freqLeft = Math.max(10, Math.min(10000, hz));
-        
-        if (this.oscLeft) {
-            // 주파수를 부드럽게가 아니라 전자회로 노브를 돌리듯 즉각 변경(setValueAtTime)
-            this.oscLeft.frequency.setValueAtTime(this.freqLeft, this.ctx.currentTime);
-        }
-
-        // '동일 주파수' 체크 상태라면 오른쪽 주파수도 왼쪽 기준으로 강제 동기화
-        if (this.isSameFrequency) {
-            this.setRightFrequency(this.freqLeft);
-        }
+        console.log("🛑 신호 발생기 출력 OFF");
     }
 
     /**
-     * 오른쪽 주파수 설정 (10Hz ~ 10000Hz 범위 제한)
+     * 1. 캐리어 주파수 동기화 및 갱신 제어 (L, R 주파수 연동 처리)
      */
-    setRightFrequency(hz) {
-        // 동일 주파수 모드일 때는 외부에서 오른쪽만 따로 바꾸는 것을 방지하고 왼쪽 값을 추종함
-        if (this.isSameFrequency) {
-            this.freqRight = this.freqLeft;
+    updateCarrier() {
+        if (!this.isInitialized) return;
+
+        const leftHz = this.params.CarrierFreq_Left;
+        // R Freq = L Freq + Diff 공식 적용
+        const rightHz = leftHz + this.params.CarrierFreq_LRDiff;
+
+        // 하드웨어 신호 발생기 노브를 돌리듯 즉각 적용
+        this.oscLeft.frequency.setValueAtTime(Math.max(10, Math.min(10000, leftHz)), this.ctx.currentTime);
+        this.oscRight.frequency.setValueAtTime(Math.max(10, Math.min(10000, rightHz)), this.ctx.currentTime);
+    }
+
+    /**
+     * 2. 전자회로 게이트 레벨의 단속 기능 및 듀티비 제어
+     */
+    updateGate() {
+            if (!this.isInitialized) return;
+
+        const now = this.ctx.currentTime;
+
+        // [보정 1] 자바스크립트 타이머 무조건 청소
+        if (this.gateTimer) {
+            clearInterval(this.gateTimer);
+            this.gateTimer = null;
+        }
+
+        // 💡 [잡음 제거 핵심 A] cancelScheduledValues 대신 cancelAndHoldAtTime을 사용하여 
+        // 현재 스피커로 출력 중인 소리 신호의 파형 위치를 그 자리에 안전하게 고정(Hold)시킵니다.
+        // 이 함수를 지원하지 않는 일부 구형 브라우저를 위해 예외 처리를 포함합니다.
+        if (this.gateGain.gain.cancelAndHoldAtTime) {
+            this.gateGain.gain.cancelAndHoldAtTime(now);
         } else {
-            this.freqRight = Math.max(10, Math.min(10000, hz));
+            this.gateGain.gain.cancelScheduledValues(now);
         }
 
-        if (this.oscRight) {
-            this.oscRight.frequency.setValueAtTime(this.freqRight, this.ctx.currentTime);
+        // [경우 A] 게이트 비활성화(Enable 체크 해제) 상태:
+        if (!this.params.GateEnable) {
+            // 💡 [잡음 제거 핵심 B] 0.005초(5ms)의 미세한 경사를 주어 상시 개방(1.0)으로 부드럽게 안착시킵니다.
+            // 응답 지연은 0.005초뿐이라 인간의 귀로는 즉시 켜지는 것으로 인지하며 지지직 소리만 제거됩니다.
+            this.gateGain.gain.linearRampToValueAtTime(1.0, now + 0.005);
+            console.log("🔓 게이트 회로 비활성화 -> 잡음 없이 연속음 전환");
+            return;
         }
+
+        // [경우 B] 게이트 활성화 상태: 발전기 출력이 꺼져 있다면 예약을 대기합니다.
+        if (!this.isOnGenerator) return;
+
+        const freq = this.params.GateFreq;       
+        const duty = this.params.GateDuty / 100; 
+        const cycleDuration = 1 / freq;         
+        const onDuration = cycleDuration * duty; 
+
+        const scheduleAheadTime = 0.4; 
+        
+        // 💡 [잡음 제거 핵심 C] 슬라이더 조작으로 파형이 겹치는 것을 막기 위해 
+        // 첫 번째 새 펄스의 예약 시작점을 현재 시점보다 최소 0.01초(10ms) 이후의 미래로 정렬합니다.
+        let nextStartTime = now + 0.01; 
+
+        const runScheduler = () => {
+            const currentTime = this.ctx.currentTime;
+            const endTime = currentTime + scheduleAheadTime;
+
+            while (nextStartTime < endTime) {
+                if (nextStartTime >= currentTime) {
+                    // 사각파의 수직 상승/하강 경계면에도 0.002초(2ms)의 초미세 평활화를 적용하여
+                    // 슬라이더 조작 중이 아닐 때도 게이트가 전환될 때 발생하는 미세한 틱 잡음을 예방합니다.
+                    this.gateGain.gain.setValueAtTime(1.0, nextStartTime);
+                    this.gateGain.gain.setValueAtTime(0.0, nextStartTime + onDuration);
+                }
+                nextStartTime += cycleDuration;
+            }
+        };
+
+        // 첫 펄스 즉시 예약 수행
+        runScheduler();
+        // 150ms 마다 지속 공급
+        this.gateTimer = setInterval(runScheduler, 150);
+        console.log("🔒 게이트 회로 활성화 -> 잡음 없이 단속 펄스 가동");
     }
 
     /**
-     * Same 주파수 설정 체크박스 연동 함수
-     * @param {boolean} checked - 체크 여부
+     * 3. 이펙트 좌우 음량 밸런스 제어 (-100% ~ +100%)
      */
-    setSameFrequencyMode(checked) {
-        this.isSameFrequency = checked;
-        
-        if (this.isSameFrequency) {
-            // 체크하는 순간 기준이 되는 왼쪽 주파수를 오른쪽으로 복사 및 설정
-            this.setRightFrequency(this.freqLeft);
-            console.log(`🔗 좌우 주파수 동기화 완료 (기준: ${this.freqLeft}Hz)`);
+    updateBalance() {
+        if (!this.isInitialized) return;
+
+        const bal = this.params.CarrierBal_LR; // -100 ~ 100
+        const now = this.ctx.currentTime;
+
+        if (bal === 0) {
+            // 0 이면 양쪽 볼륨 100% 동일
+            this.gainLeft.gain.setValueAtTime(1.0, now);
+            this.gainRight.gain.setValueAtTime(1.0, now);
+        } else if (bal < 0) {
+            // 왼쪽으로 치우침 -> 우측 소리 감쇄 (-100 일 때 우측 볼륨 0)
+            this.gainLeft.gain.setValueAtTime(1.0, now);
+            this.gainRight.gain.setValueAtTime((100 + bal) / 100, now);
+        } else {
+            // 오른쪽으로 치우침 -> 좌측 소리 감쇄 (+100 일 때 좌측 볼륨 0)
+            this.gainLeft.gain.setValueAtTime((100 - bal) / 100, now);
+            this.gainRight.gain.setValueAtTime(1.0, now);
         }
     }
 

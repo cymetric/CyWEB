@@ -29,13 +29,56 @@ export class CCyTweakpane {
     }
 
     /**
-     * 사운드(비프음 등) 설정을 제어하는 폴더 추가 함수
-     * @param {Object} targetParams - 사운드 설정 데이터 객체
+     * 사운드 설정을 제어하고 음원에 실시간 반영하는 폴더 추가 함수
+     * @param {Object} ParamsSound - 사운드 설정 데이터 객체 (main의 변수 참조)
+     * @param {Object} cySound - 사운드를 제어하는 CCySound 클래스의 인스턴스
      */
-    initSoundFolder(targetParams) {
-        const folder = this.pane.addFolder({ title: '🔊 Sound' });
+    initSoundFolder(ParamsSound, cySound) {
 
-        folder.addBinding(targetParams, 'frequency', { min: 200, max: 2000, step: 10, label: '주파수(Hz)' });
-        folder.addBinding(targetParams, 'duration', { min: 50, max: 1000, step: 50, label: '길이(ms)' });
+        const folder_sound = this.pane.addFolder({ title: '🔊 Sound' });
+
+        // 캐리어 주파수 L, R 설정. 
+        const folder_carrier = folder_sound.addFolder({ title: 'Carrier' });
+
+        folder_carrier.addBinding(ParamsSound, 'CarrierFreq_Left', { min: 10, max: 10000, step: 0.1, label: 'L(Hz)' })
+            .on('change', () => {
+                // 왼쪽 주파수가 바뀌면 캐리어 회로 즉시 갱신
+                cySound.updateCarrier();
+            });
+
+        folder_carrier.addBinding(ParamsSound, 'CarrierFreq_LRDiff', { min: -100, max: 100, step: 0.1, label: 'Diff(Hz)' })
+            .on('change', () => {
+                // 주파수 차이(Diff)가 바뀌면 캐리어 회로 즉시 갱신
+                cySound.updateCarrier();
+            });
+
+       
+        // 게이트 설정 . 
+        const folder_gate = folder_sound.addFolder({ title: 'Gate' });
+        folder_gate.addBinding(ParamsSound, 'GateEnable', { label: 'Enable' })
+            .on('change', () => {
+                // 게이트 작동 여부가 토글되면 게이트 회로 재설정
+                cySound.updateGate();
+            });
+
+        folder_gate.addBinding(ParamsSound, 'GateFreq', { min: 0.2, max: 100, step: 0.1, label: 'Freq(Hz)' })
+            .on('change', () => {
+                // 단속 주파수가 바뀌면 게이트 스케줄러 재설정
+                cySound.updateGate();
+            });
+
+        folder_gate.addBinding(ParamsSound, 'GateDuty', { min: 10, max: 90, step: 1, label: 'Duty(%)' })
+            .on('change', () => {
+                // 듀티비(ON 비율)가 바뀌면 게이트 스케줄러 재설정
+                cySound.updateGate();
+            });
+
+        // Effect 설정. 
+        const folder_effect = folder_sound.addFolder({ title: 'Effect' });
+         folder_effect.addBinding(ParamsSound, 'CarrierBal_LR', { min: -100, max: 100, step: 1, label: 'Bal LR(%)' })
+            .on('change', () => {
+                // 좌우 볼륨 밸런스가 바뀌면 이펙트 회로 즉시 갱신
+                cySound.updateBalance();
+            });
     }
 }

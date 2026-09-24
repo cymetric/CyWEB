@@ -22,11 +22,23 @@ const cySound = new CCySoundThree();
 const appSettings = {
     radius: 0.2,          // 지름 20cm (반지름 0.2m)
     rotationSpeed: 0.01,
-    frequency: 800,
-    duration: 300
+
+    
+};
+const ParamsSound = {
+
+    CarrierFreq_Left: 300,
+    CarrierFreq_LRDiff: 0,
+
+    CarrierBal_LR: 0, 
+
+    GateEnable : false,
+    GateFreq: 40,
+    GateDuty: 50
+    
 };
 
-cyPane.initSoundFolder(appSettings);
+cyPane.initSoundFolder(ParamsSound, cySound);
 
 // 페이지가 로드되자마자 3D 공간을 먼저 화면 전체에 띄워준다. (설치 zero 심리스)
 cyThree.init('canvas-container');
@@ -48,18 +60,21 @@ document.body.appendChild(VRButton.createButton(cyThree.renderer));// 화면에 
 const connectBtn = document.getElementById('connect-btn');
 
 connectBtn.addEventListener('click', async () => { // async 키워드 추가
-    console.log("버튼 작동 체크: 클릭됨");
-    
-    if (cySound.isOnGenerator) 
+    //console.log("버튼 작동 체크: 클릭됨");
+    if (!cySound.isInitialized) {
+        cySound.initGenerator(ParamsSound);
+    }
+
+    if (cySound.isOnGenerator == false) 
     {
-        cySound.stopGenerator();
+        cySound.startGenerator();
 
         connectBtn.innerText = "Stop";
         connectBtn.style.backgroundColor = "#ff4444";
     } 
     else 
     {
-        cySound.startGenerator();
+        cySound.stopGenerator();
 
         connectBtn.innerText = "Start";
         connectBtn.style.backgroundColor = "#007fff";
