@@ -11,12 +11,15 @@ import { VRButton } from 'three/addons/webxr/VRButton.js';
 
 import { CCySoundThree } from './CySound/CCySoundThree.js';
 
+//import { CCySoundThreeMulti } from './CySound/CCySoundThreeMulti.js';
+
 const cyPane = new CCyTweakpane(); // Tweakpane 생성
 
 const cyThree = new CCyThree();
 
 const cySound = new CCySoundThree();
 
+//const cySoundMulti = new CCySoundThreeMulti();
 
 // 1. UI와 연동할 원본 데이터 정의
 const appSettings = {
@@ -38,6 +41,23 @@ const ParamsSound = {
     
 };
 
+/*
+// 💡 1번 음원 파라미터 세트
+const ParamsSound_1 = {
+    CarrierFreq_Left: 200, CarrierFreq_LRDiff: 2,
+    GateEnable: true, GateFreq: 1.0, GateDuty: 30, CarrierBal_LR: 0
+};
+
+// 💡 2번 음원 파라미터 세트
+const ParamsSound_2 = {
+    CarrierFreq_Left: 880, CarrierFreq_LRDiff: 10,
+    GateEnable: true, GateFreq: 5.0, GateDuty: 70, CarrierBal_LR: 0
+};
+
+// 1. 사운드 칩 두 개 개설 (독립 회로 분양)
+cySoundMulti.createSoundChannel("Sound_1", ParamsSound_1);
+cySoundMulti.createSoundChannel("Sound_2", ParamsSound_2);
+*/
 cyPane.initSoundFolder(ParamsSound, cySound);
 
 // 페이지가 로드되자마자 3D 공간을 먼저 화면 전체에 띄워준다. (설치 zero 심리스)
@@ -60,6 +80,8 @@ document.body.appendChild(VRButton.createButton(cyThree.renderer));// 화면에 
 const connectBtn = document.getElementById('connect-btn');
 
 connectBtn.addEventListener('click', async () => { // async 키워드 추가
+    //cySoundMulti.startChannel("Sound_1");
+    //cySoundMulti.startChannel("Sound_2");
     //console.log("버튼 작동 체크: 클릭됨");
     if (!cySound.isInitialized) {
         cySound.initGenerator(ParamsSound);
@@ -67,9 +89,7 @@ connectBtn.addEventListener('click', async () => { // async 키워드 추가
         // 2. 💡 [공간음향 조립] 3D 공간의 카메라에 '귀(AudioListener)'를 부착합니다.
         cyThree.camera.add(cySound.listener);
 
-        // 3. 💡 [공간음향 조립] 신호발생기 소리가 심어진 positionalAudio를 수정구슬 메쉬에 부착합니다.
-        // (※ cyThree.crystalBallMesh는 작성하신 클래스 내 수정구슬 메쉬 변수명에 맞게 매핑하세요)
-        //cyThree.crystalSphere.add(cySound.positionalAudio);
+        // 3. 💡 [공간음향 조립] 신호발생기 소리가 심어진 positionalAudio를 오브젝트(수정구슬)에 부착합니다.
 
         cySound.attachSoundTo(cyThree.crystalSphere); 
 

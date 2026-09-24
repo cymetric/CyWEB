@@ -10,7 +10,10 @@ export class CCyThree {
         this.scene = null;
         this.camera = null;
         this.renderer = null;
+        this.crystalSphere = null; // 인스턴스 변수로 명시적 관리
 
+        // 구슬 움직임에 사용할  하드웨어 타이머 클럭 생성 (성능 상관없이 절대적 초 단위 시간 측정용)
+        this.clock = new THREE.Clock(); 
     }
 
     /**
@@ -39,7 +42,7 @@ export class CCyThree {
         this.camera.up.set(0, 0, 1); // Z축 양수(+)를 하늘(Up) 방향으로 설정
         
         // 물체를 한눈에 볼 수 있도록 Y축으로 0.5m(50cm) 뒤로 후퇴 배치
-        this.camera.position.set(0, 0.1, 0);// 0,0,0 = 사람 눈이 좌표 중심
+        this.camera.position.set(0, 0, 0);// 0,0,0 = 사람 눈이 좌표 중심
 
         // 카메라 컨트롤러(OrbitControls) 사용시 lookat 설정된 좌표를 중심으로 카메라가 회전함. 
         this.camera.lookAt(0, 1.1, 0);        // 시선 방향 (0,1,0 : Y축 +1m 방향을 향하게 함.)
@@ -82,7 +85,7 @@ export class CCyThree {
         });
 
         this.crystalSphere = new THREE.Mesh(geometry, material);
-        this.crystalSphere.position.set(0,1,0);// 
+        this.crystalSphere.position.set(0,0.15,0);// 
         this.scene.add(this.crystalSphere);
 
         // 6. 브라우저 크기 변경 대응(Responsive) 이벤트 등록
@@ -92,10 +95,31 @@ export class CCyThree {
         //this.isAnimating = true;
         //this.animate();
 
-        // 7. 애니메이션 프레임 구동 시작 (화살표 함수 적용)
+        // 7. 애니메이션 프레임 구동 시작 (화살표 함수 적용). WebXR 활용시 이거 이용해야함. 
         this.renderer.setAnimationLoop(() => {
             // 이제 여기서의 this는 클래스 자신(CCyThree 등)을 올바르게 가리킵니다.
             // 필요시 큐브나 수정구슬의 회전 연산 코드를 여기에 작성하세요.
+
+            // 프로그램이 시작된 후 누적된 경과 시간(초 단위 소수점)을 가져옵니다.
+            const elapsedTime = this.clock.getElapsedTime();
+
+            // --- 💡 [선형 물리 연산 예시 영역] ---
+            
+            // [방식 A] 한쪽 방향으로만 끊임없이 무한 선형 이동시킬 때 (초당 0.1m 속도)
+            // this.crystalSphere.position.x = elapsedTime * 0.1;
+
+            // [방식 B] 사인(Math.sin) 함수를 활용하여 특정 축을 기준으로 일정 범위를 칼같이 선형 왕복 운동시킬 때
+            // Math.sin은 시간이 흐름에 따라 -1 ~ 1 사이를 부드럽게 오고 갑니다.
+            const speed = 1.5;    // 왕복 속도 계수
+            const range = 0.2;    // 왕복 이동 반경 (0.3m = 30cm 폭)
+            
+            // X축 왕복 운동 연산 (기준점 x=0 에서 좌우로 왕복)
+            this.crystalSphere.position.x = Math.sin(elapsedTime * speed) * range;
+
+            // 만약 Y축(앞뒤)으로도 같이 움직여서 대각선이나 파동 운동을 시키고 싶다면 아래처럼 조절 가능합니다.
+            this.crystalSphere.position.y = Math.cos(elapsedTime * speed) * range;
+
+            // -------------------------------------
             
             // scene과 camera 역시 클래스의 멤버 변수라면 this.scene, this.camera 형식이어야 합니다.
             this.renderer.render(this.scene, this.camera);

@@ -84,9 +84,12 @@ export class CCySoundThree {
         this.positionalAudio.setNodeSource(this.masterGain);
 
         // 💡 [공간음향 파라미터 세팅] 
-        this.positionalAudio.setRefDistance(1);       // 소리가 감쇄하기 시작하는 기준 거리 (1m)
-        this.positionalAudio.setMaxDistance(20);      // 소리가 들리는 최대 거리 (20m)
-        this.positionalAudio.setDistanceModel('linear'); // 거리에 따라 선형적으로 소리가 줄어들게 설정
+        this.positionalAudio.setRefDistance(0.05);       // 소리가 감쇄하기 시작하는 기준 거리 (1m)
+        this.positionalAudio.setMaxDistance(1);      // 소리가 들리는 최대 거리 (20m)
+
+        // linear : 거리가 멀어질수록 소리가 일정한 비율(정비례)로 줄어듭니다. MaxDistance에 도달하면 소리가 칼같이 0이 됩니다.
+        // inverse : 거리가 가까울 때는 급격히 커지고, 멀어질수록 소리가 완만하게 줄어듭니다. 우리가 살아가는 실제 물리 세계와 가장 똑같은 방식입
+        this.positionalAudio.setDistanceModel('inverse'); // 거리에 따라 선형적으로 소리가 줄어들게 설정. linear,inverse, exponential 
 
 
         // 발진 클럭 영구 기동
