@@ -21,7 +21,7 @@ export class CCyThree {
         this.container = document.getElementById(containerId);
         if (!this.container) return;
 
-        // 1. Scene (우주 공간 생성)
+        // 1. Scene (공간 생성)
         this.scene = new THREE.Scene();
         // 깊이감을 주는 아주 어두운 청회색 배경
         this.scene.background = new THREE.Color(0x0a0c10); 
@@ -29,9 +29,20 @@ export class CCyThree {
         // 2. Camera (카메라 설정 - 인간의 눈과 유사한 FOV 60도)
         const width = this.container.clientWidth;
         const height = this.container.clientHeight;
-        this.camera = new THREE.PerspectiveCamera(60, width / height, 0.01, 100);
-        // 물체를 한눈에 볼 수 있도록 z축으로 0.5m(50cm) 뒤로 후퇴 배치
-        this.camera.position.set(0, 0, 0.5);
+
+        // Three.js의 PerspectiveCamera는 기본적으로 카메라 자체의 로컬 -Z 방향을 앞(시선 방향)으로 인식.
+        // 인자 : 60 시야각. 
+        // 3번인자 : Near Clip Plane 카메라 렌즈로부터 1cm(0.01m)보다 더 가까이 있는 물체는 화면에 보이지 않고 잘려 나갑니다(투명하게 통과됨).0은 불가. 
+        // 4번인자 : Far Clip Plane.카메라로부터 100m보다 더 멀리 있는 물체는 아무리 거대해도 화면에 렌더링되지 않고 사라집니다.
+        this.camera = new THREE.PerspectiveCamera(60, width / height, 0.0001, 20);
+        // 카메라를 생성한 직후, lookAt을 호출하기 '전'에 설정해야 함. 
+        this.camera.up.set(0, 0, 1); // Z축 양수(+)를 하늘(Up) 방향으로 설정
+        
+        // 물체를 한눈에 볼 수 있도록 Y축으로 0.5m(50cm) 뒤로 후퇴 배치
+        this.camera.position.set(0, 0.1, 0);// 0,0,0 = 사람 눈이 좌표 중심
+
+        // 카메라 컨트롤러(OrbitControls) 사용시 lookat 설정된 좌표를 중심으로 카메라가 회전함. 
+        this.camera.lookAt(0, 1.1, 0);        // 시선 방향 (0,1,0 : Y축 +1m 방향을 향하게 함.)
 
         // 3. Renderer (고정밀 3D 렌더러 설정)
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -55,7 +66,7 @@ export class CCyThree {
 
         // 5. Crystal Sphere (지름 20cm 투명 수정구슬 생성)
         // Three.js의 단위는 1 = 1m 이므로 지름 20cm는 반지름 10cm(0.1)입니다.
-        const geometry = new THREE.SphereGeometry(0.1, 32,32);//64, 64); // 세밀한 64분할 구체
+        const geometry = new THREE.SphereGeometry(0.005, 32,32);//64, 64); // 세밀한 64분할 구체
         
         const material = new THREE.MeshPhysicalMaterial({
             color: 0xffffff,
@@ -71,6 +82,7 @@ export class CCyThree {
         });
 
         this.crystalSphere = new THREE.Mesh(geometry, material);
+        this.crystalSphere.position.set(0,1,0);// 
         this.scene.add(this.crystalSphere);
 
         // 6. 브라우저 크기 변경 대응(Responsive) 이벤트 등록

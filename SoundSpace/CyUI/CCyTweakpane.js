@@ -73,9 +73,9 @@ export class CCyTweakpane {
                 cySound.updateGate();
             });
 
-        // Effect 설정. 
-        const folder_effect = folder_sound.addFolder({ title: 'Effect' });
-         folder_effect.addBinding(ParamsSound, 'CarrierBal_LR', { min: -100, max: 100, step: 1, label: 'Bal LR(%)' })
+        // Vol L-R 설정. 
+        const folder_vol = folder_sound.addFolder({ title: 'Volume' });
+         folder_vol.addBinding(ParamsSound, 'VolBal_LR', { min: -100, max: 100, step: 1, label: 'Bal LR(%)' })
             .on('change', () => {
                 // 좌우 볼륨 밸런스가 바뀌면 이펙트 회로 즉시 갱신
                 cySound.updateBalance();

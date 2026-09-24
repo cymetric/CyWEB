@@ -22,11 +22,14 @@ export class CCySoundThree {
         // 3. 최종 마스터 출력단
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime); // 초기 차단 상태
-        this.masterGain.connect(this.ctx.destination);
+        //스피커에 연결하지 않고 오디오 신호를 모아주는 내부 믹서 역할만 하도록 주석처리. this.masterGain.connect(this.ctx.destination);// masterGain은 스피커에 직접 연결
+
+
+        //Three.js의 공간음향을 담당할 3D 오디오 객체 선언
+        this.positionalAudio = null;
 
         this.isInitialized = false;
         this.isOnGenerator = false;
-
         // 4. 내부 상태 저장 변수들
         this.params = null; 
     }
@@ -38,6 +41,9 @@ export class CCySoundThree {
     initGenerator(ParamsSound) {
         if (this.isInitialized) return;
         this.params = ParamsSound;
+
+        // [A] Three.js 공간음향 객체 생성 (나의 귀 역할을 하는 listener 주입)
+        this.positionalAudio = new THREE.PositionalAudio(this.listener);
 
         // [A] 오디오 소스 발진기 및 팬 노드 생성
         this.oscLeft = this.ctx.createOscillator();
@@ -59,7 +65,7 @@ export class CCySoundThree {
         this.gateLFO.type = 'sawtooth'; // 톱니파를 사용하여 듀티비 기준선 비교 처리 기반 마련
         this.gateGain = this.ctx.createGain(); 
 
-        // [C] 회로 배선 연결 (Signal Routing)
+        // [C] 회로 배선 연결 (Signal Routing) 
         // 좌측 채널: OscL -> GainL -> PannerL -> GateGain
         this.oscLeft.connect(this.gainLeft);
         this.gainLeft.connect(this.pannerLeft);
@@ -73,12 +79,24 @@ export class CCySoundThree {
         // 게이트 출력 -> 최종 마스터 출력
         this.gateGain.connect(this.masterGain);
 
+        // 💡 [핵심 배선 전환] 최종 합산된 신호발생기 출력(masterGain)을 
+        // 스피커(ctx.destination)가 아니라 Three.js의 3D 오디오 입력단으로 우회 연결합니다.
+        this.positionalAudio.setNodeSource(this.masterGain);
+
+        // 💡 [공간음향 파라미터 세팅] 
+        this.positionalAudio.setRefDistance(1);       // 소리가 감쇄하기 시작하는 기준 거리 (1m)
+        this.positionalAudio.setMaxDistance(20);      // 소리가 들리는 최대 거리 (20m)
+        this.positionalAudio.setDistanceModel('linear'); // 거리에 따라 선형적으로 소리가 줄어들게 설정
+
+
         // 발진 클럭 영구 기동
         this.oscLeft.start();
         this.oscRight.start();
         this.gateLFO.start();
 
         this.isInitialized = true;
+
+        
 
         // 현재 파라미터 초기값 회로 적용
         this.updateCarrier();
@@ -215,7 +233,7 @@ export class CCySoundThree {
     updateBalance() {
         if (!this.isInitialized) return;
 
-        const bal = this.params.CarrierBal_LR; // -100 ~ 100
+        const bal = this.params.VolBal_LR; // -100 ~ 100
         const now = this.ctx.currentTime;
 
         if (bal === 0) {
@@ -230,6 +248,40 @@ export class CCySoundThree {
             // 오른쪽으로 치우침 -> 좌측 소리 감쇄 (+100 일 때 좌측 볼륨 0)
             this.gainLeft.gain.setValueAtTime((100 - bal) / 100, now);
             this.gainRight.gain.setValueAtTime(1.0, now);
+        }
+    }
+
+
+    /**
+     * 💡 [추가] 특정 3D 오브젝트에 소리를 장착합니다.
+     * @param {THREE.Object3D} targetMesh - 소리를 심을 Three.js 메쉬 객체
+     */
+    attachSoundTo(targetMesh) {
+        if (!this.isInitialized || !this.positionalAudio) {
+            console.warn("⚠️ 사운드 엔진이 초기화되지 않아 소리를 붙일 수 없습니다.");
+            return;
+        }
+
+        // [안전 장치] 소리가 이미 어딘가에 붙어있다면, 먼저 안전하게 떼어냅니다.
+        this.detachSound();
+
+        // 새로운 타겟 오브젝트에 소리 객체를 자식으로 등록 (이 시점부터 공간 음향 좌표 연동)
+        targetMesh.add(this.positionalAudio);
+        this.currentTargetMesh = targetMesh; // 현재 어디 붙어있는지 기록
+
+        console.log(`🔌 3D 오디오 신호선을 오브젝트(${targetMesh.name || '이름없음'})에 연결 완료`);
+    }
+
+    /**
+     * 💡 [추가] 현재 소리가 붙어있는 오브젝트로부터 소리 신호선을 안전하게 분리합니다.
+     */
+    detachSound() {
+        if (this.currentTargetMesh && this.positionalAudio) {
+            // 기존 부모 오브젝트에서 소리 객체를 제거
+            this.currentTargetMesh.remove(this.positionalAudio);
+            
+            console.log(`🚏 오브젝트(${this.currentTargetMesh.name || '이름없음'})로부터 오디오 신호선 분리 완료`);
+            this.currentTargetMesh = null;
         }
     }
 

@@ -30,7 +30,7 @@ const ParamsSound = {
     CarrierFreq_Left: 300,
     CarrierFreq_LRDiff: 0,
 
-    CarrierBal_LR: 0, 
+    VolBal_LR: 0, 
 
     GateEnable : false,
     GateFreq: 40,
@@ -63,6 +63,17 @@ connectBtn.addEventListener('click', async () => { // async 키워드 추가
     //console.log("버튼 작동 체크: 클릭됨");
     if (!cySound.isInitialized) {
         cySound.initGenerator(ParamsSound);
+
+        // 2. 💡 [공간음향 조립] 3D 공간의 카메라에 '귀(AudioListener)'를 부착합니다.
+        cyThree.camera.add(cySound.listener);
+
+        // 3. 💡 [공간음향 조립] 신호발생기 소리가 심어진 positionalAudio를 수정구슬 메쉬에 부착합니다.
+        // (※ cyThree.crystalBallMesh는 작성하신 클래스 내 수정구슬 메쉬 변수명에 맞게 매핑하세요)
+        //cyThree.crystalSphere.add(cySound.positionalAudio);
+
+        cySound.attachSoundTo(cyThree.crystalSphere); 
+
+        //cySound.detachSound();
     }
 
     if (cySound.isOnGenerator == false) 
