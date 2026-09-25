@@ -21,6 +21,9 @@ const cySound = new CCySoundThree();
 
 //const cySoundMulti = new CCySoundThreeMulti();
 
+// 그래픽 엔진 클래스 내부로 사운드 엔진 인스턴스를 주입하여 연결 통로를 개설합니다.
+cyThree.cySound = cySound; 
+
 // 1. UI와 연동할 원본 데이터 정의
 const appSettings = {
     radius: 0.2,          // 지름 20cm (반지름 0.2m)

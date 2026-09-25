@@ -110,17 +110,30 @@ export class CCyThree {
 
             // [방식 B] 사인(Math.sin) 함수를 활용하여 특정 축을 기준으로 일정 범위를 칼같이 선형 왕복 운동시킬 때
             // Math.sin은 시간이 흐름에 따라 -1 ~ 1 사이를 부드럽게 오고 갑니다.
-            const speed = 1.5;    // 왕복 속도 계수
-            const range = 0.2;    // 왕복 이동 반경 (0.3m = 30cm 폭)
+            const targetHz = 0.05;    // 왕복 속도 계수
+            const range = 0.1;    // 왕복 이동 반경 (0.3m = 30cm 폭)
             
             // X축 왕복 운동 연산 (기준점 x=0 에서 좌우로 왕복)
-            this.crystalSphere.position.x = Math.sin(elapsedTime * speed) * range;
+            //this.crystalSphere.position.x = Math.sin(elapsedTime * (Math.PI * 2 * targetHz)) * range;
 
             // 만약 Y축(앞뒤)으로도 같이 움직여서 대각선이나 파동 운동을 시키고 싶다면 아래처럼 조절 가능합니다.
-            this.crystalSphere.position.y = Math.cos(elapsedTime * speed) * range;
+            this.crystalSphere.position.y = Math.cos(elapsedTime * (Math.PI * 2 * targetHz)) * range;
 
             // -------------------------------------
             
+
+            // 💡 [새로운 시각화 핵심] 외부에서 주입된 사운드 엔진이 있다면 실시간 게이트 레벨을 읽어옵니다.
+            if (this.cySound) {
+                const gateLevel = this.cySound.getRealtimeGateLevel(); // 0.0 또는 1.0 추출
+                
+                // 게이트가 열려 소리가 날 때는 밝기를 2.5레벨로 강하게 번쩍이고, 꺼지면 0.0(암전)으로 만듭니다.
+                // 최대 밝기 값(예: 2.5)을 조절하여 번쩍임의 강도를 튜닝할 수 있습니다.
+                this.crystalSphere.material.emissiveIntensity = gateLevel * 2.5; 
+            } else {
+                // 사운드가 연결 안 되었을 때는 기본 밝기 유지
+                this.crystalSphere.material.emissiveIntensity = 1.0;
+            }
+
             // scene과 camera 역시 클래스의 멤버 변수라면 this.scene, this.camera 형식이어야 합니다.
             this.renderer.render(this.scene, this.camera);
         });

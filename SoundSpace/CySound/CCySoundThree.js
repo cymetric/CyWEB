@@ -99,7 +99,7 @@ export class CCySoundThree {
 
         this.isInitialized = true;
 
-        
+        this.visualGateLevel = 1.0;// gate 동기화 시각표현용 
 
         // 현재 파라미터 초기값 회로 적용
         this.updateCarrier();
@@ -218,6 +218,19 @@ export class CCySoundThree {
                     // 슬라이더 조작 중이 아닐 때도 게이트가 전환될 때 발생하는 미세한 틱 잡음을 예방합니다.
                     this.gateGain.gain.setValueAtTime(1.0, nextStartTime);
                     this.gateGain.gain.setValueAtTime(0.0, nextStartTime + onDuration);
+
+
+                    // 2026.09.25. [시각화 싱크 추가] 오디오 버퍼 타이밍에 맞추어 메인 스레드 시각화 변수도 동기 조절하기 위해 
+                    // 현재 타임스탬프와 일치하는 구간을 계산.
+                    const timeOffset = nextStartTime - currentTime;
+                    setTimeout(() => {
+                        if (this.isOnGenerator && this.params.GateEnable) this.visualGateLevel = 1.0;
+                    }, timeOffset * 1000);
+
+                    setTimeout(() => {
+                        if (this.isOnGenerator && this.params.GateEnable) this.visualGateLevel = 0.0;
+                    }, (timeOffset + onDuration) * 1000);
+
                 }
                 nextStartTime += cycleDuration;
             }
@@ -286,6 +299,21 @@ export class CCySoundThree {
             console.log(`🚏 오브젝트(${this.currentTargetMesh.name || '이름없음'})로부터 오디오 신호선 분리 완료`);
             this.currentTargetMesh = null;
         }
+    }
+
+    /**
+     * 💡 [추가] 현재 게이트 회로의 실시간 개방도(0.0 ~ 1.0)를 반환합니다.
+     * 렌더 루프에서 구슬의 LED 밝기를 동기화하는 데 사용됩니다.
+     */
+    getRealtimeGateLevel() {
+        if (!this.isInitialized || !this.isOnGenerator) return 0.0;
+        
+        // 게이트가 아예 꺼져있다면(Enable=false) 상시 개방 상태이므로 1.0 반환
+        if (!this.params.GateEnable) return 1.0;
+
+        // [정밀 보정] 오디오 타임라인상 '바로 지금 이 순간'의 게이트 gain 값을 정확히 추출합니다.
+        // Web Audio API 명세에 따라 현재 시점의 파라미터 값(value)을 읽어옵니다.
+        return this.visualGateLevel;
     }
 
     /**
